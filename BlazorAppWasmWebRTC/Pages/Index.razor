@@ -8,17 +8,18 @@ Welcome to your new app.
 <SurveyPrompt Title="How is Blazor working for you?" />
 
 @code {
-    RTCPeerConnection client;
+    [Inject]
+    RTCPeerConnection client { get; set; }
     List<RTCIceCandidate> clientCandidates = new List<RTCIceCandidate>();
     RTCDataChannel dcClient;
-    RTCPeerConnection server;
+    [Inject]
+    RTCPeerConnection server { get; set; }
     RTCDataChannel dcServer;
     List<RTCIceCandidate> serverCandidates = new List<RTCIceCandidate>();
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            client = new RTCPeerConnection(jsRuntime);
             client.onicecandidate += async (obj, ice) =>
             {
                 if (string.IsNullOrEmpty(server.SignalingState))
@@ -28,10 +29,13 @@ Welcome to your new app.
                 }
                 server.addIceCandidate(ice);
             };
-            server = new RTCPeerConnection(jsRuntime);
             server.ondatachannel += async (obj, dc) =>
             {
                 dcServer = dc;
+                dc.OnDataMessage += (s, ex) =>
+                {
+                    Console.WriteLine("Received a message from client");
+                };
             };
             server.onicecandidate += (obj, ice) =>
             {
@@ -80,8 +84,6 @@ Welcome to your new app.
                 data[i] = i;
 
             dc.Send(data);
-
-            int x = 0;
         }
 
         await base.OnAfterRenderAsync(firstRender);

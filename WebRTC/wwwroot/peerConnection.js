@@ -122,10 +122,10 @@ var BlazorWebRTC;
             this.dataChannel.onmessage = (ev) => __awaiter(this, void 0, void 0, function* () {
                 if (ev.data instanceof ArrayBuffer) {
                     var u8 = new Uint8Array(ev.data);
-                    //var decoder = new TextDecoder('utf8');
-                    //var text = decoder.decode(u8);
-                    //var b64encoded = btoa(text);
-                    yield helper.invokeMethod("_ondatamessage", u8);
+                    var decoder = new TextDecoder('utf8');
+                    var text = decoder.decode(u8);
+                    var b64encoded = btoa(text);
+                    yield helper.invokeMethod("_ondatamessage", b64encoded);
                 }
                 else {
                     yield helper.invokeMethodAsync("_onmessage", ev.data);

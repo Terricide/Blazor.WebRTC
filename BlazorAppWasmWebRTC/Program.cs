@@ -1,3 +1,4 @@
+using Blazor.WebRTC;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ namespace BlazorAppWasmWebRTC
             builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
             // Program.cs
             builder.Services.AddSingleton<IJSInProcessRuntime>(services => (IJSInProcessRuntime)services.GetRequiredService<IJSRuntime>());
+            builder.Services.AddTransient<RTCPeerConnection>();
 
             await builder.Build().RunAsync();
         }

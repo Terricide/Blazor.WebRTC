@@ -123,10 +123,10 @@ namespace BlazorWebRTC {
             this.dataChannel.onmessage = async (ev) => {
                 if (ev.data instanceof ArrayBuffer) {
                     var u8 = new Uint8Array(ev.data);
-                    //var decoder = new TextDecoder('utf8');
-                    //var text = decoder.decode(u8);
-                    //var b64encoded = btoa(text);
-                    await helper.invokeMethod("_ondatamessage", u8);
+                    var decoder = new TextDecoder('utf8');
+                    var text = decoder.decode(u8);
+                    var b64encoded = btoa(text);
+                    await helper.invokeMethod("_ondatamessage", b64encoded);
                 }
                 else {
                     await helper.invokeMethodAsync("_onmessage", ev.data);
