@@ -1,0 +1,150 @@
+﻿@page "/"
+@inject RTCPeerConnection localConnection;
+@inject RTCPeerConnection remoteConnection;
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+<SurveyPrompt Title="How is Blazor working for you?" />
+
+@code
+{
+    Queue<RTCIceCandidateInit> clientCandidates = new Queue<RTCIceCandidateInit>();
+    RTCDataChannel dcClient;
+    RTCDataChannel dcServer;
+    Queue<RTCIceCandidateInit> serverCandidates = new Queue<RTCIceCandidateInit>();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Task.Run(StartConnection);
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task StartConnection()
+    {
+        //RTCSessionDescription offer = null;
+        //RTCSessionDescriptionInit answer = null;
+        await Task.Delay(2000);
+        //client.OnNegotiationNeeded += async (s, ex) =>
+        //{
+        //    await client.setLocalDescription();
+        //    offer = client.localDescription;
+        //    Console.WriteLine("Offer created:" + offer.sdp);
+        //};
+        localConnection.OnIceCandidate += async (obj, ice) =>
+        {
+            if (ice == null || ice.candidate == null)
+            {
+                Console.WriteLine("Client ice done");
+                return;
+            }
+            if (remoteConnection.SignalingState != RTCSignalingState.HaveLocalOffer && remoteConnection.SignalingState != RTCSignalingState.HaveRemoteOffer)
+            {
+                Console.WriteLine("Adding remoteConnection ice:" + ice?.candidate?.candidate + " to queue");
+                serverCandidates.Enqueue(ice);
+                return;
+            }
+            Console.WriteLine("Adding remoteConnection ice:" + ice?.candidate?.candidate);
+            await remoteConnection.addIceCandidate(ice.candidate);
+        };
+        remoteConnection.OnDataChannel += async (obj, dc) =>
+        {
+            dcServer = dc;
+            dc.OnDataMessage += (s, ex) =>
+            {
+                Console.WriteLine("Received a message from client");
+            };
+        };
+        remoteConnection.OnIceCandidate += async (obj, ice) =>
+        {
+            if (ice == null || ice.candidate == null)
+            {
+                Console.WriteLine("Server ice done");
+                return;
+            }
+
+            if (localConnection.SignalingState != RTCSignalingState.HaveLocalOffer && localConnection.SignalingState != RTCSignalingState.HaveRemoteOffer)
+            {
+                Console.WriteLine("Adding localConnection ice:" + ice?.candidate?.candidate + " to queue");
+                clientCandidates.Enqueue(ice);
+                return;
+            }
+            Console.WriteLine("Adding localConnection ice:" + ice?.candidate?.candidate);
+            await localConnection.addIceCandidate(ice.candidate);
+        };
+
+        dcClient = localConnection.createDataChannel("default");
+        dcClient.OnDataMessage += (s, ex) =>
+        {
+            Console.WriteLine("Received a message from server");
+        };
+        var offer = await localConnection.createOffer();
+        Console.WriteLine("offer:" + offer.sdp);
+        await localConnection.setLocalDescription(offer);
+        await remoteConnection.setRemoteDescription(offer);
+        var answer = await remoteConnection.createAnswer();
+        Console.WriteLine("answer:" + answer.sdp);
+        await remoteConnection.setLocalDescription(answer);
+        await localConnection.setRemoteDescription(answer);
+
+        //await client.setLocalDescription(offer);
+
+        //await server.setRemoteDescription(offer);
+        //await Task.Delay(500);
+        //var answer = await server.createAnswer();
+        //await server.setLocalDescription(answer);
+
+        //await client.setRemoteDescription(answer);
+
+        try
+        {
+            await Task.Delay(500);
+
+            while (serverCandidates.TryDequeue(out var ice))
+            {
+                Console.WriteLine("Adding remoteConnection ice:" + ice?.candidate + " from queue");
+                await remoteConnection.addIceCandidate(ice.candidate);
+            }
+
+            while (clientCandidates.TryDequeue(out var ice))
+            {
+                Console.WriteLine("Adding localConnection ice:" + ice?.candidate + " from queue");
+                await localConnection.addIceCandidate(ice.candidate);
+            }
+
+            while (true)
+            {
+                if (dcClient.ReadyState == RTCDataChannelState.Open)
+                {
+                    break;
+                }
+
+                Console.WriteLine("DC State:" + dcClient.ReadyState);
+
+                await Task.Delay(1000);
+            }
+
+            Console.WriteLine("DC:" + dcClient?.ReadyState);
+
+            while (true)
+            {
+                byte[] data = new byte[256];
+                for (byte i = 0; i < 50; i++)
+                    data[i] = i;
+
+                dcClient.Send(data);
+
+                dcClient.Send("Hello");
+                await Task.Delay(1000);
+            }
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+        }
+    }
+}
