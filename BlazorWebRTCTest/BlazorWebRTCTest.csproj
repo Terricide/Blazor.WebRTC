@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+﻿<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WasmWebRtc\System.Net.WebRTC.csproj" />
+    <ProjectReference Include="..\System.Net.WebRTC\System.Net.WebRTC.csproj" />
   </ItemGroup>
 
 </Project>
