@@ -9,7 +9,7 @@ using System.Net.WebRTC;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BlazorApp1
+namespace BlazorWebRTCTest
 {
     public class Program
     {
