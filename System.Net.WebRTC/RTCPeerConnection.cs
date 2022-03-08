@@ -43,12 +43,19 @@ namespace System.Net.WebRTC
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:WebAssembly.Net.WebSockets.ClientWebSocket"/> class.
 		/// </summary>
-		public RTCPeerConnection()
-		{
+		public RTCPeerConnection(RTCConfiguration configuration = null)
+		{	
 			state = created;
 			cts = new CancellationTokenSource();
 
-			innerRtcPeerConnection = new HostObject("RTCPeerConnection");
+			if (configuration == null)
+			{
+				innerRtcPeerConnection = new HostObject("RTCPeerConnection");
+			}
+			else
+            {
+				innerRtcPeerConnection = new HostObject("RTCPeerConnection", configuration);
+			}
 
 			onIcecandidate = new Action<JSObject>((e) =>
             {
@@ -227,11 +234,11 @@ namespace System.Net.WebRTC
 
 		public async Task setRemoteDescription(RTCSessionDescriptionInit init)
 		{
-			var desc = new HostObject("RTCSessionDescription",init);
+			var desc = new HostObject("RTCSessionDescription",init.HostObject);
 			desc.SetObjectProperty("type", init.type.ToString().ToLower());
 			desc.SetObjectProperty("sdp", init.sdp);
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("setRemoteDescription", desc);
-			var res = await task;
+			await task;
 		}
 
 		public async Task setRemoteDescription(RTCSessionDescription init)
@@ -240,7 +247,7 @@ namespace System.Net.WebRTC
 			desc.SetObjectProperty("type", init.type.ToString().ToLower());
 			desc.SetObjectProperty("sdp", init.sdp);
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("setRemoteDescription", desc);
-			var res = await task;
+			await task;
 		}
 
 		public async Task addIceCandidate(RTCIceCandidate candidate)

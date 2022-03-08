@@ -9,6 +9,10 @@ namespace System.Net.WebRTC
         {
             this.HostObject = hostObj;
         }
+        public RTCSessionDescriptionInit()
+        {
+            this.HostObject = new HostObject("RTCSessionDescription");
+        }
         public RTCSdpType type
         {
             get
@@ -17,12 +21,21 @@ namespace System.Net.WebRTC
                 Enum.TryParse<RTCSdpType>(str, true, out var r);
                 return r;
             }
+            set
+            {
+                var strType = value.ToString().ToLower();
+                HostObject.SetObjectProperty("type", strType);
+            }
         }
         public string sdp
         {
             get
             {
                 return HostObject.GetObjectProperty("sdp") as string;
+            }
+            set
+            {
+                HostObject.SetObjectProperty("sdp", value);
             }
         }
 
