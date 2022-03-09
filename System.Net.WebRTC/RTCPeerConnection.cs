@@ -161,24 +161,24 @@ namespace System.Net.WebRTC
 			return dataChannel;
 		}
 
-		public async Task<RTCSessionDescriptionInit> createOffer()
+		public async Task<RTCSessionDescription> createOffer()
         {
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("createOffer");
 
 			var offer = await task as JSObject;
 
-			var init = new RTCSessionDescriptionInit(offer);
+			var init = new RTCSessionDescription(offer);
 
 			return init;
 		}
 
-		public async Task<RTCSessionDescriptionInit> createAnswer()
+		public async Task<RTCSessionDescription> createAnswer()
         {
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("createAnswer");
 
 			var answer = await task as JSObject;
 
-			var init = new RTCSessionDescriptionInit(answer);
+			var init = new RTCSessionDescription(answer);
 
 			return init;
 		}
@@ -220,7 +220,7 @@ namespace System.Net.WebRTC
 			}
 		}
 
-		public async Task setLocalDescription(RTCSessionDescriptionInit init)
+		public async Task setLocalDescription(RTCSessionDescription init)
         {
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("setLocalDescription", init.HostObject);
 			var res = await task;
@@ -234,7 +234,7 @@ namespace System.Net.WebRTC
 
 		public async Task setRemoteDescription(RTCSessionDescriptionInit init)
 		{
-			var desc = new HostObject("RTCSessionDescription",init.HostObject);
+			var desc = new HostObject("RTCSessionDescription", init);
 			desc.SetObjectProperty("type", init.type.ToString().ToLower());
 			desc.SetObjectProperty("sdp", init.sdp);
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("setRemoteDescription", desc);

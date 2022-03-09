@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices.JavaScript;
+﻿using System.Collections.Generic;
+using System.Runtime.InteropServices.JavaScript;
 
 namespace System.Net.WebRTC
 {
@@ -12,6 +13,14 @@ namespace System.Net.WebRTC
         public RTCSessionDescription()
         {
             this.HostObject = new HostObject("RTCSessionDescription");
+        }
+        public RTCSessionDescription(RTCSdpType type, string sdp)
+        {
+            var strType = type.ToString().ToLower();
+            var dict = new Dictionary<string, string>();
+            dict.Add("type", strType);
+            dict.Add("sdp", sdp);
+            this.HostObject = new HostObject("RTCSessionDescription", dict);
         }
         public RTCSdpType type
         {
