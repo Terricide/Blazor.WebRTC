@@ -1,4 +1,6 @@
-﻿using System.Collections.Concurrent;
+﻿using Microsoft.JSInterop;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Runtime.InteropServices.JavaScript;
 using System.Text.Json;
 using System.Threading;
@@ -40,30 +42,57 @@ namespace System.Net.WebRTC
 		private const int connected = 2;
 		private const int disposed = 3;
 
+		private readonly Lazy<Task<IJSInProcessObjectReference>> moduleTask;
+		private readonly Lazy<Task<IJSInProcessObjectReference>> initTask;
+		private RTCConfiguration configuration = null;
+
 		/// <summary>
 		/// Initializes a new instance of the <see cref="T:WebAssembly.Net.WebSockets.ClientWebSocket"/> class.
 		/// </summary>
-		public RTCPeerConnection(RTCConfiguration configuration = null)
-		{	
+		public RTCPeerConnection(IJSRuntime jsRuntime, RTCConfiguration configuration = null)
+		{
+			this.configuration = configuration;
 			state = created;
 			cts = new CancellationTokenSource();
+
+			moduleTask = new(() => jsRuntime.InvokeAsync<IJSInProcessObjectReference>(
+			   "import", "./_content/System.Net.WebRTC/webrtclib.js").AsTask());
+
+			initTask = new(() =>
+			{
+				return Init();
+			});
+		}
+
+		private async Task<IJSInProcessObjectReference> Init()
+        {
+			var loaded = await moduleTask.Value;
 
 			if (configuration == null)
 			{
 				innerRtcPeerConnection = new HostObject("RTCPeerConnection");
 			}
 			else
-            {
-				innerRtcPeerConnection = new HostObject("RTCPeerConnection", configuration);
+			{
+				await loaded.InvokeVoidAsync("init", DotNetObjectReference.Create(this));
+                var window = (JSObject)System.Runtime.InteropServices.JavaScript.Runtime.GetGlobalObject("window");
+                //var options = new JsonSerializerOptions
+                //{
+                //	DefaultIgnoreCondition = Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+                //	PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                //};
+                //var json = System.Text.Json.JsonSerializer.Serialize(configuration, options);
+                var desc = (JSObject)window.Invoke("CreatePeerConnection");
+                innerRtcPeerConnection = desc;
 			}
 
 			onIcecandidate = new Action<JSObject>((e) =>
-            {
+			{
 				//var json = e.Invoke("toJSON");
 				var c = e.GetObjectProperty("candidate") as JSObject;
 				RTCIceCandidate iceCandidate = null;
 				if (c != null)
-                {
+				{
 					iceCandidate = new RTCIceCandidate();
 					iceCandidate.candidate = c?.GetObjectProperty("candidate") as string;
 					iceCandidate.sdpMid = c?.GetObjectProperty("sdpMid") as string;
@@ -74,22 +103,22 @@ namespace System.Net.WebRTC
 					candidate = iceCandidate
 				});
 				e.Dispose();
-            });
+			});
 
-            // Attach the onError callback
-            innerRtcPeerConnection.SetObjectProperty("onicecandidate", onIcecandidate);
+			// Attach the onError callback
+			innerRtcPeerConnection.SetObjectProperty("onicecandidate", onIcecandidate);
 
 			// Setup the onOpen callback
 			onDataChannel = new Action<JSObject>((evt) =>
-            {
+			{
 				var channel = (JSObject)evt.GetObjectProperty("channel");
 				var dc = new RTCDataChannel(channel);
 				OnDataChannel?.Invoke(this, dc);
 				evt.Dispose();
-            });
+			});
 
-            // Attach the onOpen callback
-            innerRtcPeerConnection.SetObjectProperty("ondatachannel", onDataChannel);
+			// Attach the onOpen callback
+			innerRtcPeerConnection.SetObjectProperty("ondatachannel", onDataChannel);
 
 			onNegotiationNeeded = new Action<JSObject>((e) =>
 			{
@@ -131,7 +160,7 @@ namespace System.Net.WebRTC
 				e.Dispose();
 			});
 
-			innerRtcPeerConnection.Invoke("addEventListener", "icecandidateerror", onIceconnectionstatechange);
+			innerRtcPeerConnection.Invoke("addEventListener", "oniceconnectionstatechange", onIceconnectionstatechange);
 
 			onSignalingstatechange = new Action<JSObject>((e) =>
 			{
@@ -140,6 +169,8 @@ namespace System.Net.WebRTC
 			});
 
 			innerRtcPeerConnection.Invoke("addEventListener", "signalingstatechange", onSignalingstatechange);
+
+			return loaded;
 		}
 
 		#region Properties
@@ -152,8 +183,10 @@ namespace System.Net.WebRTC
             }
         }
 
-		public RTCDataChannel createDataChannel(string label)
+		public async Task<RTCDataChannel> createDataChannel(string label)
         {
+			await initTask.Value;
+
 			Console.WriteLine("Creating datachannel:" + label);
 			var dc = innerRtcPeerConnection.Invoke("createDataChannel", label) as JSObject;
 			var dataChannel = new RTCDataChannel(dc);
@@ -163,6 +196,8 @@ namespace System.Net.WebRTC
 
 		public async Task<RTCSessionDescription> createOffer()
         {
+			await initTask.Value;
+
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("createOffer");
 
 			var offer = await task as JSObject;
@@ -174,6 +209,8 @@ namespace System.Net.WebRTC
 
 		public async Task<RTCSessionDescription> createAnswer()
         {
+			await initTask.Value;
+
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("createAnswer");
 
 			var answer = await task as JSObject;
@@ -222,36 +259,43 @@ namespace System.Net.WebRTC
 
 		public async Task setLocalDescription(RTCSessionDescription init)
         {
+			await initTask.Value;
+
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("setLocalDescription", init.HostObject);
 			var res = await task;
 		}
 
 		public async Task setLocalDescription()
 		{
+			await initTask.Value;
+
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("setLocalDescription");
 			var res = await task;
 		}
 
 		public async Task setRemoteDescription(RTCSessionDescriptionInit init)
 		{
-			var desc = new HostObject("RTCSessionDescription", init);
-			desc.SetObjectProperty("type", init.type.ToString().ToLower());
-			desc.SetObjectProperty("sdp", init.sdp);
+			await initTask.Value;
+
+			var strType = init.type.ToString().ToLower();
+
+			var window = (JSObject)System.Runtime.InteropServices.JavaScript.Runtime.GetGlobalObject("window");
+			var desc = window.Invoke("CreateRTCSessionDescription", strType, init.sdp);
+
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("setRemoteDescription", desc);
 			await task;
 		}
 
-		public async Task setRemoteDescription(RTCSessionDescription init)
-		{
-			var desc = new HostObject("RTCSessionDescription");
-			desc.SetObjectProperty("type", init.type.ToString().ToLower());
-			desc.SetObjectProperty("sdp", init.sdp);
-			var task = (Task<object>)innerRtcPeerConnection.Invoke("setRemoteDescription", desc);
-			await task;
-		}
+		private class SDI
+        {
+			public string type;
+			public string sdp;
+        }
 
 		public async Task addIceCandidate(RTCIceCandidate candidate)
         {
+			await initTask.Value;
+
 			var json = (JSObject)System.Runtime.InteropServices.JavaScript.Runtime.GetGlobalObject("JSON");
 			var desc = json.Invoke("parse", JsonSerializer.Serialize(candidate));
 			var task = (Task<object>)innerRtcPeerConnection.Invoke("addIceCandidate", desc);
